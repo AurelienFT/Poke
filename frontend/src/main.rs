@@ -8,27 +8,31 @@ use web_sys::window;
 extern "C" {
     #[wasm_bindgen(js_name = invokeHello, catch)]
     pub async fn hello(name: String) -> Result<JsValue, JsValue>;
+
+    #[wasm_bindgen(js_name = invokeLogin, catch)]
+    pub async fn login(username: String, password: String) -> Result<JsValue, JsValue>;
 }
 
 #[function_component]
 fn App() -> Html {
-    let welcome = use_state_eq(|| "".to_string());
-    let name = use_state_eq(|| "World".to_string());
+    let username = use_state_eq(|| "".to_string());
+    let password = use_state_eq(|| "".to_string());
+    let access_token = use_state(|| "".to_string());
 
     // Execute tauri command via effects.
     // The effect will run every time `name` changes.
     {
-        let welcome = welcome.clone();
+        let access_token = access_token.clone();
         use_effect_with_deps(
-            move |name| {
-                update_welcome_message(welcome, name.clone());
+            move |(username, password)| {
+                perform_login(username.clone(), password.clone(), access_token);
                 || ()
             },
-            (*name).clone(),
+            ((*username).clone(), (*password).clone()),
         );
     }
 
-    let message = (*welcome).clone();
+    let message = (*access_token).clone();
     let counter = use_state(|| 0);
     let onclick = {
         let counter = counter.clone();
@@ -47,15 +51,15 @@ fn App() -> Html {
     }
 }
 
-fn update_welcome_message(welcome: UseStateHandle<String>, name: String) {
+fn perform_login(username: String, password: String, access_token: UseStateHandle<String>) {
     spawn_local(async move {
         info!("Test");
         // This will call our glue code all the way through to the tauri
         // back-end command and return the `Result<String, String>` as
         // `Result<JsValue, JsValue>`.
-        match hello(name).await {
-            Ok(message) => {
-                welcome.set(message.as_string().unwrap());
+        match login(username, password).await {
+            Ok(token) => {
+                access_token.set(token.as_string().unwrap());
             }
             Err(e) => {
                 let window = window().unwrap();
