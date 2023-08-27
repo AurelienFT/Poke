@@ -1,5 +1,6 @@
 {
     "rust-analyzer.linkedProjects": [
-        "./frontend/Cargo.toml"
+        "./frontend/Cargo.toml",
+        "./src-tauri/Cargo.toml"
     ]
 }

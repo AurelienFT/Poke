@@ -5,27 +5,17 @@ use api::Account;
 
 mod api;
 
-#[tauri::command]
-fn hello(name: &str) -> Result<String, String> {
-  // This is a very simplistic example but it shows how to return a Result
-  // and use it in the front-end.
-  if name.contains(' ') {
-    Err("Name should not contain spaces".to_string())
-  } else {
-    Ok(format!("Hello, {}", name))
-  }
-}
-
 
 #[tauri::command]
-fn login(username: &str, password: &str) -> Result<String, String> {
-  let account = Account::login(username.to_string(), password.to_string());
+async fn login(username: &str, password: &str) -> Result<String, String> {
+  let account = Account::login(username.to_string(), password.to_string()).await;
   Ok(account.access_token)
 }
 
 fn main() {
+  dotenv::dotenv().ok();
   tauri::Builder::default()
-    .invoke_handler(tauri::generate_handler![hello, login])
+    .invoke_handler(tauri::generate_handler![login])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }

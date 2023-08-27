@@ -19,19 +19,6 @@ fn App() -> Html {
     let password = use_state_eq(|| "".to_string());
     let access_token = use_state(|| "".to_string());
 
-    // Execute tauri command via effects.
-    // The effect will run every time `name` changes.
-    {
-        let access_token = access_token.clone();
-        use_effect_with_deps(
-            move |(username, password)| {
-                perform_login(username.clone(), password.clone(), access_token);
-                || ()
-            },
-            ((*username).clone(), (*password).clone()),
-        );
-    }
-
     let message = (*access_token).clone();
     let counter = use_state(|| 0);
     let onclick = {
@@ -42,10 +29,45 @@ fn App() -> Html {
         }
     };
 
+    let on_input_username = {
+        let username = username.clone();
+        Callback::from(
+            move |event: InputEvent| {
+                let value = event.data().unwrap();
+                username.set(value);
+            }
+        )
+    };
+
+    let on_input_password = {
+        let password = password.clone();
+        Callback::from(
+            move |event: InputEvent| {
+                let value = event.data().unwrap();
+                password.set(value);
+            }
+        )
+    };
+
+    let on_login = {
+        Callback::from(
+            move |_: MouseEvent| perform_login((*username).clone(), (*password).clone(), access_token.clone())
+        )
+    };
+
     html! {
         <div>
             <button {onclick}>{ "+1" }</button>
             <p>{ *counter }</p>
+            <input
+                type="text"
+                oninput={on_input_username}
+            />
+            <input
+                type="password"
+                oninput={on_input_password}
+            />
+            <button onclick={on_login}>{ "Connect" }</button>
             <p>{message}</p>
         </div>
     }
