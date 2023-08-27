@@ -44,9 +44,9 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: 
-          './frontend -> target'
-          './src-tauri -> target'
+          workspaces: |
+          ./frontend
+          ./src-tauri
 
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
