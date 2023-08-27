@@ -3,7 +3,7 @@
     "beforeBuildCommand": "cd frontend && trunk build",
     "beforeDevCommand": "cd frontend && trunk serve",
     "devPath": "http://localhost:8080",
-    "distDir": "../fronted/dist",
+    "distDir": "../frontend/dist",
     "withGlobalTauri": true
   },
   "package": {
