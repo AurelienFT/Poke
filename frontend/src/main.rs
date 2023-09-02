@@ -1,13 +1,12 @@
-use std::{ops::Deref, time::Duration};
-
-use gloo_utils::document;
-use js_sys::Reflect;
-use log::{info, error};
+use log::info;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::window;
 use yew::prelude::*;
+
+mod hcaptcha;
+use crate::hcaptcha::HCaptcha;
 
 #[wasm_bindgen(module = "/public/glue.js")]
 extern "C" {
@@ -57,24 +56,14 @@ fn App() -> Html {
             }
         }
     });
-    use_effect_with_deps(
-        move |captcha_data| {
-            if let Err(e) = inject_script(captcha_data.clone()) {
-                error!("{:?}", e);
-            }
-            || ()
-        },
-        (*captcha_data).clone(),
-    );
-    let message = (*access_token).clone();
-    let counter = use_state(|| 0);
-    let onclick = {
-        let counter = counter.clone();
-        move |_| {
-            let value = *counter + 1;
-            counter.set(value);
+
+    if (*captcha_data).is_none() {
+        return html! {
+            <div>
+                <p>{ "Loading captcha..." }</p>
+            </div>
         }
-    };
+    }
 
     let on_input_username = {
         let username = username.clone();
@@ -104,11 +93,16 @@ fn App() -> Html {
         })
     };
 
+    let on_load_captcha = Callback::from(move |_: ()| {
+        if let Some(data) = &*captcha_data {
+            test(data.data.clone());
+        } else {
+            ()
+        }
+    });
+
     html! {
         <div>
-            <script src="https://hcaptcha.com/1/api.js?onload=GoogleRecaptchaLoaded" async=true defer=true />
-            <button {onclick}>{ "+1" }</button>
-            <p>{ *counter }</p>
             <input
                 type="text"
                 oninput={on_input_username}
@@ -118,7 +112,7 @@ fn App() -> Html {
                 oninput={on_input_password}
             />
             <button onclick={on_login}>{ "Connect" }</button>
-            <div class="h-captcha" data-sitekey="019f1553-3845-481c-a6f5-5a60ccf6d830" data-theme="dark"></div>
+            <HCaptcha site_key={"019f1553-3845-481c-a6f5-5a60ccf6d830"} on_load={on_load_captcha}/>
         </div>
     }
 }
@@ -142,39 +136,6 @@ fn perform_login(username: String, password: String, access_token: UseStateHandl
     });
 }
 
-fn inject_script(captcha_data: Option<CaptchaData>)-> Result<(), JsValue> {
-    if captcha_data.is_none() {
-        return Ok(());
-    }
-    let google_loaded = Closure::wrap(Box::new(move |_| {
-        if let Some(data) = captcha_data.clone() {
-            test(data.data);
-        } else {
-            ()
-        }
-    }) as Box<dyn FnMut(JsValue)>);
-
-    Reflect::set(
-        &JsValue::from(web_sys::window().unwrap()),
-        &JsValue::from("GoogleRecaptchaLoaded"),
-        google_loaded.as_ref().unchecked_ref(),
-    )?;
-    google_loaded.forget();
-    let script = document().create_element("script").unwrap();
-    script.set_attribute("async", "true")?;
-    script.set_attribute("defer", "true")?;
-    let listener = Closure::wrap(Box::new(|_| {}) as Box<dyn FnMut(JsValue)>);
-    let site_url = format!(
-        "https://js.hcaptcha.com/1/api.js?hl=fr?onload=GoogleRecaptchaLoaded",
-    );
-
-    script.set_attribute("type", "text/javascript")?;
-    let body = document()
-        .body()
-        .ok_or(JsValue::from_str("Can't find body"))?;
-    body.append_child(&script)?;
-    Ok(())
-}
 
 fn main() {
     wasm_logger::init(wasm_logger::Config::default());
