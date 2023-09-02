@@ -18,18 +18,16 @@ struct PokeState {
 }
 
 #[tauri::command]
-async fn login(username: &str, password: &str, captcha_data: String, state: tauri::State<'_, PokeState>) -> Result<String, String> {
-  let account = Account::login(username.to_string(), password.to_string(), Captcha::Resolved(captcha_data, state.cookies.clone())).await;
+async fn login(username: &str, password: &str, captcha: String, state: tauri::State<'_, PokeState>) -> Result<String, String> {
+  let account = Account::login(username.to_string(), password.to_string(), Captcha::Resolved(captcha, state.cookies.clone())).await;
   Ok(account.access_token)
 }
 
 #[tauri::command]
-async fn get_captcha_data() -> Result<CaptchaData, String> {
-  println!("Getting captcha data");
-  let (website_key, data, _) = Account::get_captcha_data().await;
+async fn get_captcha_data(state: tauri::State<'_, PokeState>) -> Result<CaptchaData, String> {
   Ok(CaptchaData {
-    website_key,
-    data
+    website_key: state.captcha_data.website_key.clone(),
+    data: state.captcha_data.data.clone()
   })
 }
 
