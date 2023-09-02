@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use api::{Account, Captcha, CookieJar};
+use log::{info, warn};
 use serde::{Serialize, Deserialize};
 
 mod api;
@@ -33,6 +34,7 @@ async fn get_captcha_data(state: tauri::State<'_, PokeState>) -> Result<CaptchaD
 
 #[tokio::main]
 async fn main() {
+  env_logger::init();
   tauri::async_runtime::set(tokio::runtime::Handle::current());
   dotenv::dotenv().ok();
   let (website_key, data, cookies) = Account::get_captcha_data().await;

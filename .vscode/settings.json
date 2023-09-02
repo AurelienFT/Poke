@@ -2,5 +2,6 @@
     "rust-analyzer.linkedProjects": [
         "./frontend/Cargo.toml",
         "./src-tauri/Cargo.toml"
-    ]
+    ],
+    "rust-analyzer.showUnlinkedFileNotification": false
 }

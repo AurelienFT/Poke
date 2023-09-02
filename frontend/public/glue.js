@@ -1,5 +1,5 @@
 const invoke = window.__TAURI__.invoke
-console.log(window);
+
 
 export async function invokeLogin(username, password) {
     let captcha = document.getElementsByName('h-captcha-response')[0].value;
@@ -8,5 +8,10 @@ export async function invokeLogin(username, password) {
 }
 
 export async function invokeGetCaptchaData() {
-    return await invoke("get_captcha_data");
+    let res = await invoke("get_captcha_data");
+    return res;
+}
+
+export function test(data) {
+    hcaptcha.setData('', {rqdata: data})
 }

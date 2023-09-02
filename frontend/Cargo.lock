@@ -597,6 +597,7 @@ dependencies = [
 name = "riot-client-rs"
 version = "0.1.0"
 dependencies = [
+ "gloo-utils",
  "humantime",
  "js-sys",
  "log",

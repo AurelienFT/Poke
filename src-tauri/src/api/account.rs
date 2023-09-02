@@ -39,6 +39,23 @@ pub struct Account {
     pub cookies: CookieJar,
 }
 
+fn display_request(request: &reqwest::Request) {
+    println!("{}, {:?}", request.method(), request.url().to_string());
+    println!("Headers:");
+    for (key, value) in request.headers().iter() {
+        println!("{}: {}", key, value.to_str().unwrap());
+    }
+    println!("Body: {:?}", String::from_utf8(request.body().unwrap().as_bytes().unwrap().to_vec()).unwrap());
+}
+
+fn display_response(response: &reqwest::Response) {
+    println!("{}, {:?}", response.status(), response.url().to_string());
+    println!("Headers:");
+    for (key, value) in response.headers().iter() {
+        println!("{}: {}", key, value.to_str().unwrap());
+    }
+}
+
 impl Account {
     // Key Data Cookies
     pub async fn get_captcha_data() -> (String, String, CookieJar) {
@@ -53,41 +70,55 @@ impl Account {
             "response_type": "token id_token",
             "scope": "openid link ban lol_region account"
         }).to_string();
+        let request = Client::new()
+        .post("https://auth.riotgames.com/api/v1/authorization")
+        .header(CONTENT_TYPE, "application/json")
+        .header(ACCEPT, "application/json")
+        .header(
+            USER_AGENT,
+            "RiotClient/70.0.0.247.1382 rso-auth (Windows;10;;Professional, x64)",
+        )
+        .header(PRAGMA, "no-cache")
+        .body(body.clone()).build().unwrap();
+        display_request(&request);
         let resp = Client::new()
-            .post("https://auth.riotgames.com/api/v1/authorization")
-            .header(CONTENT_TYPE, "application/json")
-            .header(ACCEPT, "application/json")
-            .header(
-                USER_AGENT,
-                "RiotClient/70.0.0.247.1382 rso-auth (Windows;10;;Professional, x64)",
-            )
-            .header(PRAGMA, "no-cache")
-            .body(body.clone())
-            .send()
+            .execute(request)
             .await
             .unwrap();
-        let cookie = resp.headers().get("set-cookie").unwrap();
-        let resp2 = Client::new()
-            .post("https://auth.riotgames.com/api/v1/authorization")
-            .header(CONTENT_TYPE, "application/json")
-            .header(ACCEPT, "application/json")
-            .header(
-                USER_AGENT,
-                "RiotClient/70.0.0.247.1382 rso-auth (Windows;10;;Professional, x64)",
-            )
-            .header(PRAGMA, "no-cache")
-            .header(COOKIE, cookie)
-            .body(body)
-            .send()
-            .await
-            .unwrap();
-
         let mut jar = CookieJar::new();
+        for (key, value) in resp.headers().iter() {
+            if key == "set-cookie" {
+                jar.add(value.to_str().unwrap().to_string());
+            }
+        }
+        display_response(&resp);
+        let body = resp.text().await.unwrap();
+        println!("Body: {}", body);
+        let request = Client::new()
+            .post("https://auth.riotgames.com/api/v1/authorization")
+            .header(CONTENT_TYPE, "application/json")
+            .header(ACCEPT, "application/json")
+            .header(
+                USER_AGENT,
+                "RiotClient/70.0.0.247.1382 rso-auth (Windows;10;;Professional, x64)",
+            )
+            .header(PRAGMA, "no-cache")
+            .header(COOKIE, jar.create_cookie_header())
+            .body(body)
+            .build()
+            .unwrap();
+            display_request(&request);
+            let resp2 = Client::new().execute(request)
+            .await
+            .unwrap();
         for (key, value) in resp2.headers().iter() {
             if key == "set-cookie" {
                 jar.add(value.to_str().unwrap().to_string());
             }
         }
+        display_response(&resp2);
+        let body = resp2.text().await.unwrap();
+        println!("Body: {}", body);
         let json = json!({
         "apple": null,
         "campaign": null,
@@ -117,7 +148,7 @@ impl Account {
         "type": "auth",
         "xbox": null
         }).to_string();
-        let resp3 = Client::new()
+        let request = Client::new()
             .post("https://authenticate.riotgames.com/api/v1/login")
             .header(CONTENT_TYPE, "application/json")
             .header(ACCEPT, "application/json")
@@ -127,7 +158,11 @@ impl Account {
             )
             .header(COOKIE, jar.create_cookie_header())
             .body(json)
-            .send()
+            .build()
+            .unwrap();
+        display_request(&request);
+        let resp3 = Client::new()
+            .execute(request)
             .await
             .unwrap();
         for (key, value) in resp3.headers().iter() {
@@ -135,7 +170,10 @@ impl Account {
                 jar.add(value.to_str().unwrap().to_string());
             }
         }
-        let response = serde_json::from_str::<serde_json::Value>(&resp3.text().await.unwrap()).unwrap();
+        display_response(&resp3);
+        let body = resp3.text().await.unwrap();
+        println!("Body: {}", body);
+        let response = serde_json::from_str::<serde_json::Value>(&body).unwrap();
         let captcha = response
             .as_object()
             .unwrap()
@@ -176,15 +214,20 @@ impl Account {
                   }
                 });
                 let body = json.to_string();
-                let resp4 = Client::new()
+                let request = Client::new()
                     .post("https://api.capsolver.com/createTask")
                     .header(HOST, "api.capsolver.com")
                     .header(CONTENT_TYPE, "application/json")
                     .body(body)
-                    .send()
-                    .await
+                    .build()
                     .unwrap();
+                display_request(&request);
+                let resp4 = Client::new()
+                .execute(request)
+                .await.unwrap();
+                display_response(&resp4);
                 let text = resp4.text().await.unwrap();
+                println!("Body: {}", text);
                 let response = serde_json::from_str::<ResponseSentCaptcha>(
                     &text,
                 )
@@ -195,16 +238,20 @@ impl Account {
                 });
                 let body = json.to_string();
                 std::thread::sleep(std::time::Duration::from_secs(10));
-                let resp5 = Client::new()
+                let request = Client::new()
                     .post("https://api.capsolver.com/getTaskResult")
                     .header(HOST, "api.capsolver.com")
                     .header(CONTENT_TYPE, "application/json")
                     .body(body)
-                    .send()
+                    .build()
+                    .unwrap();
+                display_request(&request);
+                let resp5 = Client::new().execute(request)
                     .await
                     .unwrap();
+                display_response(&resp5);
                 let text = resp5.text().await.unwrap();
-                println!("response5: {}", text);
+                println!("Body: {}", text);
                 let response = serde_json::from_str::<ResponseGetCaptchaResult>(
                     &text,
                 )
@@ -227,8 +274,7 @@ impl Account {
             },
             "type": "auth"
         }).to_string();
-        println!("cookies: {}", jar.create_cookie_header());
-        let resp6 = Client::new()
+        let request = Client::new()
             .put("https://authenticate.riotgames.com/api/v1/login")
             .header(CONTENT_TYPE, "application/json")
             .header(ACCEPT, "application/json")
@@ -238,11 +284,16 @@ impl Account {
             )
             .header(COOKIE, jar.create_cookie_header())
             .body(body)
-            .send()
+            .build()
+            .unwrap();
+        display_request(&request);
+        let resp6 = Client::new()
+            .execute(request)
             .await
             .unwrap();
+        display_response(&resp6);
         let text = resp6.text().await.unwrap();
-        println!("response6: {}", text);
+        println!("Body: {}", text);
         let response = serde_json::from_str::<serde_json::Value>(&text).unwrap();
         let token = response
             .as_object()
