@@ -1,5 +1,6 @@
 use cookie::Cookie;
 
+#[derive(Debug, Clone)]
 pub struct CookieJar {
     cookies: Vec<Cookie<'static>>,
 }

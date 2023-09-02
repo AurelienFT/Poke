@@ -29,14 +29,19 @@ pub struct ResponseGetCaptchaResult {
     pub solution: Option<SolutionCaptcha>,
 }
 
+pub enum Captcha {
+    Resolved(String, CookieJar),
+    ToResolveWithCapsolver,
+}
+
 pub struct Account {
     pub access_token: String,
     pub cookies: CookieJar,
 }
 
 impl Account {
-    pub async fn login(username: String, password: String) -> Account {
-        let cap_solver_api = std::env::var("CAPSOLVER_API_KEY").unwrap();
+    // Key Data Cookies
+    pub async fn get_captcha_data() -> (String, String, CookieJar) {
         let body = json!({
             "acr_values": "",
             "claims": "",
@@ -142,63 +147,74 @@ impl Account {
             .unwrap()
             .as_object()
             .unwrap();
-        let json = json!({
-          "clientKey": cap_solver_api,
-          "task": {
-            //Required. Can use HCaptchaTaskProxyless or HCaptchaTask
-            "type": "HCaptchaTaskProxyLess",
-            //Required
-            "websiteURL": "https://authenticate.riotgames.com/api/v1/login",
-            // Required
-            "websiteKey": captcha.get("key").unwrap().as_str().unwrap(),
-            // Optional
-            "isInvisible": true,
-            // Optional
-            "enterprisePayload": {
-              //Optional, required if the site have HCaptcha Enterprise
-              "rqdata": captcha.get("data").unwrap().as_str().unwrap()
-            },
-            "userAgent": ""
-          }
-        });
-        let body = json.to_string();
-        let resp4 = Client::new()
-            .post("https://api.capsolver.com/createTask")
-            .header(HOST, "api.capsolver.com")
-            .header(CONTENT_TYPE, "application/json")
-            .body(body)
-            .send()
-            .await
-            .unwrap();
-        let text = resp4.text().await.unwrap();
-        let response = serde_json::from_str::<ResponseSentCaptcha>(
-            &text,
-        )
-        .unwrap();
-        let json = json!({
-            "clientKey": cap_solver_api,
-            "taskId": response.task_id,
-        });
-        let body = json.to_string();
-        std::thread::sleep(std::time::Duration::from_secs(10));
-        let resp5 = Client::new()
-            .post("https://api.capsolver.com/getTaskResult")
-            .header(HOST, "api.capsolver.com")
-            .header(CONTENT_TYPE, "application/json")
-            .body(body)
-            .send()
-            .await
-            .unwrap();
-        let text = resp5.text().await.unwrap();
-        println!("{:?}", text);
-        let response = serde_json::from_str::<ResponseGetCaptchaResult>(
-            &text,
-        )
-        .unwrap();
-        let solution = response
-            .solution
-            .unwrap()
-            .g_recaptcha_response;
+        (String::from(captcha.get("key").unwrap().as_str().unwrap()), String::from(captcha.get("data").unwrap().as_str().unwrap()), jar)
+    }
+
+    pub async fn login(username: String, password: String, captcha: Captcha) -> Account {
+        let (solution, mut jar) = match captcha {
+            Captcha::Resolved(answer, jar) => (answer, jar),
+            Captcha::ToResolveWithCapsolver => {
+                let cap_solver_api = std::env::var("CAPSOLVER_API_KEY").unwrap();
+                let (website_key, rq_data, jar) = Account::get_captcha_data().await;
+                let json = json!({
+                  "clientKey": cap_solver_api,
+                  "task": {
+                    //Required. Can use HCaptchaTaskProxyless or HCaptchaTask
+                    "type": "HCaptchaTaskProxyLess",
+                    //Required
+                    "websiteURL": "https://authenticate.riotgames.com/api/v1/login",
+                    // Required
+                    "websiteKey": website_key,
+                    // Optional
+                    "isInvisible": true,
+                    // Optional
+                    "enterprisePayload": {
+                      //Optional, required if the site have HCaptcha Enterprise
+                      "rqdata": rq_data
+                    },
+                    "userAgent": ""
+                  }
+                });
+                let body = json.to_string();
+                let resp4 = Client::new()
+                    .post("https://api.capsolver.com/createTask")
+                    .header(HOST, "api.capsolver.com")
+                    .header(CONTENT_TYPE, "application/json")
+                    .body(body)
+                    .send()
+                    .await
+                    .unwrap();
+                let text = resp4.text().await.unwrap();
+                let response = serde_json::from_str::<ResponseSentCaptcha>(
+                    &text,
+                )
+                .unwrap();
+                let json = json!({
+                    "clientKey": cap_solver_api,
+                    "taskId": response.task_id,
+                });
+                let body = json.to_string();
+                std::thread::sleep(std::time::Duration::from_secs(10));
+                let resp5 = Client::new()
+                    .post("https://api.capsolver.com/getTaskResult")
+                    .header(HOST, "api.capsolver.com")
+                    .header(CONTENT_TYPE, "application/json")
+                    .body(body)
+                    .send()
+                    .await
+                    .unwrap();
+                let text = resp5.text().await.unwrap();
+                println!("response5: {}", text);
+                let response = serde_json::from_str::<ResponseGetCaptchaResult>(
+                    &text,
+                )
+                .unwrap();
+                (response
+                    .solution
+                    .unwrap()
+                    .g_recaptcha_response, jar)
+            }
+        };
         let body = json!({
             "riot_identity": {
                 "campaign": null,
@@ -211,6 +227,7 @@ impl Account {
             },
             "type": "auth"
         }).to_string();
+        println!("cookies: {}", jar.create_cookie_header());
         let resp6 = Client::new()
             .put("https://authenticate.riotgames.com/api/v1/login")
             .header(CONTENT_TYPE, "application/json")
@@ -225,6 +242,7 @@ impl Account {
             .await
             .unwrap();
         let text = resp6.text().await.unwrap();
+        println!("response6: {}", text);
         let response = serde_json::from_str::<serde_json::Value>(&text).unwrap();
         let token = response
             .as_object()
