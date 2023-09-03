@@ -5,8 +5,7 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::window;
 use yew::prelude::*;
 
-mod hcaptcha;
-use crate::hcaptcha::HCaptcha;
+use yew_hcaptcha::HCaptcha;
 
 #[wasm_bindgen(module = "/public/glue.js")]
 extern "C" {

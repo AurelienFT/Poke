@@ -609,6 +609,7 @@ dependencies = [
  "wasm-logger",
  "web-sys",
  "yew",
+ "yew-hcaptcha",
 ]
 
 [[package]]
@@ -922,6 +923,20 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "yew-macro",
+]
+
+[[package]]
+name = "yew-hcaptcha"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80ab3955042e1aeb8c412c4ff65b21046afba1b81c8bb6f249288737c6bb0ee3"
+dependencies = [
+ "gloo-utils",
+ "js-sys",
+ "log",
+ "wasm-bindgen",
+ "web-sys",
+ "yew",
 ]
 
 [[package]]
